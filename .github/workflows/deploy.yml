@@ -1,8 +1,8 @@
-name: MinTic Deploy to AWS CloudFormatio
+name: MinTic Deploy to AWS CloudFormation
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -20,8 +20,11 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
 
-    - name: MinTic Deploy CloudFormation stack
-      run: |
-        aws cloudformation deploy \
-          --template-file template.yml \
-          --stack-name MiSegundaStackConGITHUB \
+   
+    - name: Deploy EC2
+      run: aws cloudformation deploy --template-file templates/ec2.yml --stack-name MinTicEC2Stack
+  
+    - name: Deploy S3
+      run: aws cloudformation deploy --template-file templates/s3.yml --stack-name MinTicS3
+
+          
