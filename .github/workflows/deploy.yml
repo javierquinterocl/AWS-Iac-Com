@@ -32,7 +32,7 @@ jobs:
     - name: Deploy EC2 Web (S3 App)
       run: |
         aws cloudformation deploy \
-          --template-file templates/ec2-web.yml \
+          --template-file templates/ec2.yml \
           --stack-name MinTicEC2WebStack \
           --capabilities CAPABILITY_IAM
         
