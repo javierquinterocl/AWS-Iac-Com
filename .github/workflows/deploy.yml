@@ -26,8 +26,6 @@ jobs:
           --template-file templates/mintic-architecture.yml \
           --stack-name MinticFullArchitecture \
           --parameter-overrides \
-            MinticKeyName=pardeclaveshoy \
-            MinticAmiId=ami-0f88e80871fd81e91 \
             InstanceType=t3.micro \
           --capabilities CAPABILITY_IAM \
           --no-fail-on-empty-changeset
