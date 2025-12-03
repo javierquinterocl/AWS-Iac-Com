@@ -18,23 +18,12 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
 
-    - name: Delete EC2 Web Stack
+    - name: MinTic Delete EC2 Stack
       run: |
-        aws cloudformation delete-stack --stack-name MinTicEC2WebStack
-        echo "Waiting for MinTicEC2WebStack deletion..."
-        aws cloudformation wait stack-delete-complete --stack-name MinTicEC2WebStack || true
-        echo "MinTicEC2WebStack deleted!"
-
-    - name: Delete S3 Stack
-      run: |
-        aws cloudformation delete-stack --stack-name MinTicS3
-        echo "Waiting for MinTicS3 deletion..."
-        aws cloudformation wait stack-delete-complete --stack-name MinTicS3 || true
-        echo "MinTicS3 deleted!"
-
-    - name: Delete Main Stack
-      run: |
-        aws cloudformation delete-stack --stack-name MiPrimerStackConGITHUB
-        echo "Waiting for MiPrimerStackConGITHUB deletion..."
-        aws cloudformation wait stack-delete-complete --stack-name MiPrimerStackConGITHUB || true
-        echo "All stacks deleted successfully!"
+        echo "Eliminando stack MinTicEC2Stack..."
+        aws cloudformation delete-stack --stack-name MinTicEC2Stack
+        
+        echo "Esperando a que se complete la eliminación..."
+        aws cloudformation wait stack-delete-complete --stack-name MinTicEC2Stack
+        
+        echo "Stack MinTicEC2Stack eliminado exitosamente!"
