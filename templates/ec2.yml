@@ -1,182 +1,63 @@
----
 AWSTemplateFormatVersion: '2010-09-09'
-Description: EC2 Instance that deploys a web application from S3
+Description: Instancias EC2 estáticas en dos AZ con UserData
+
+Parameters:
+  MinticAmiId:
+    Description: AMI para las instancias EC2
+    Type: String
+    Default: ami-0f88e80871fd81e91
 
 Resources:
-  EC2SecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security group for EC2 web instance with HTTP and SSH access
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-          Description: Allow HTTP traffic
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
-          Description: Allow SSH access
-      Tags:
-        - Key: Name
-          Value: MinTic EC2 Web Security Group
 
-  EC2InstanceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ec2.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: S3AccessPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:PutObject
-                  - s3:ListBucket
-                Resource:
-                  - arn:aws:s3:::mintic-bucket-144618663163-us-east-1
-                  - arn:aws:s3:::mintic-bucket-144618663163-us-east-1/*
-      Tags:
-        - Key: Name
-          Value: MinTic EC2 Web Role
-
-  EC2InstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      Roles:
-        - !Ref EC2InstanceRole
-
-  EC2WebInstance:
+  # Instancia EC2 estática en AZ1 con UserData
+  MinticEC2AZ1:
     Type: AWS::EC2::Instance
     Properties:
-      AvailabilityZone: us-east-1a
-      ImageId: ami-0f88e80871fd81e91
-      InstanceType: t3.micro
-      IamInstanceProfile: !Ref EC2InstanceProfile
-      SecurityGroups:
-        - !Ref EC2SecurityGroup
+      ImageId: !Ref MinticAmiId
+      InstanceType: t2.micro
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          SubnetId:
+            Fn::ImportValue: Mintic-SubnetPublic1
+          DeviceIndex: 0
+          GroupSet:
+            - Fn::ImportValue: Mintic-SecurityGroupId
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          # =====================================================
-          # SCRIPT DE DESPLIEGUE AUTOMÁTICO DESDE S3 HACIA EC2
-          # Autor: Wilder Duarte
-          # Descripción:
-          #   - Instala dependencias
-          #   - Descarga y despliega aplicación desde S3
-          #   - Registra logs locales y en S3
-          # =====================================================
-
-          # Archivo de log local
-          LOG_FILE="/var/log/deploy.log"
-          exec > >(tee -a "$LOG_FILE") 2>&1
-
-          echo "===== INICIO DEL DESPLIEGUE ====="
-
-          # Actualiza el sistema e instala dependencias
-          echo "Actualizando sistema e instalando dependencias..."
           yum update -y
-          yum install -y httpd aws-cli unzip
-
-          # Inicia y habilita Apache
-          echo "Iniciando servicio Apache..."
-          systemctl enable httpd
+          yum install -y httpd
           systemctl start httpd
+          systemctl enable httpd
+          echo "<html><body><h1>Hola desde EC2 AZ1 - IP: $(hostname -f)</h1></body></html>" > /var/www/html/index.html
 
-          # Configuración del bucket y archivo
-          BUCKET="mintic-bucket-344505381574-us-east-1"
-          ZIPFILE="project.zip"
-          DEST="/var/www/html"
-
-          echo "Bucket configurado: $BUCKET"
-          echo "Archivo a desplegar: $ZIPFILE"
-
-          # Descargar archivo ZIP desde S3
-          echo "Descargando $ZIPFILE desde S3..."
-          aws s3 cp s3://$BUCKET/$ZIPFILE /tmp/$ZIPFILE
-
-          # Verificar si la descarga fue exitosa
-          if [ ! -f /tmp/$ZIPFILE ]; then
-              echo "ERROR: No se pudo descargar el archivo $ZIPFILE desde S3."
-              exit 1
-          fi
-
-          # Descomprimir en la raíz del servidor web
-          echo "Descomprimiendo archivo..."
-          unzip -o /tmp/$ZIPFILE -d $DEST
-
-          # Si el ZIP contiene una carpeta 'eliza', mueve su contenido
-          if [ -d "$DEST/project" ]; then
-              echo "Reorganizando estructura del proyecto..."
-              mv $DEST/project/* $DEST/
-              rm -rf $DEST/project
-          fi
-
-          # Ajustar permisos para Apache
-          echo "Ajustando permisos..."
-          chown -R apache:apache $DEST
-          find $DEST -type d -exec chmod 755 {} \;
-          find $DEST -type f -exec chmod 644 {} \;
-
-          # Obtener token IMDSv2 para metadata
-          echo "Obteniendo metadata de la instancia..."
-          TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" \
-              -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-
-          INSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/instance-id)
-          PRIVATE_IP=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/local-ipv4)
-          PUBLIC_IP=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/public-ipv4)
-          FECHA=$(date +"%Y-%m-%d_%H-%M-%S")
-
-          # Crear archivo de estado visible en el sitio web
-          echo "Creando archivo de estado en el sitio web..."
-          cat <<EOF > $DEST/status.txt
-          <h2>Aplicación desplegada correctamente desde S3 ($ZIPFILE)</h2>
-          <p>Fecha de despliegue: $FECHA</p>
-          <p>Instancia: $INSTANCE_ID</p>
-          <p>IP Pública: $PUBLIC_IP</p>
-          <p>IP Privada: $PRIVATE_IP</p>
-          EOF
-
-          # Crear contenido del log local
-          echo "Generando registro del despliegue..."
-          LOG_CONTENT="Despliegue exitoso:
-          Fecha: $FECHA
-          Instancia: $INSTANCE_ID
-          IP Privada: $PRIVATE_IP
-          IP Pública: $PUBLIC_IP
-          Archivo desplegado: $ZIPFILE
-          Bucket origen: $BUCKET
-          ------------------------------------------"
-
-          # Guardar log localmente (además del log general)
-          echo "$LOG_CONTENT" > /tmp/deploy-log.txt
-
-          # Subir log a S3 dentro de la carpeta logs
-          echo "Subiendo log a S3..."
-          aws s3 cp /tmp/deploy-log.txt s3://$BUCKET/logs/deploy_${!INSTANCE_ID}_${!FECHA}.txt
-
-          echo "===== DESPLIEGUE FINALIZADO CON ÉXITO ====="
-      Tags:
-        - Key: Name
-          Value: MinTic EC2 Web Instance
+  # Instancia EC2 estática en AZ2 con UserData
+  MinticEC2AZ2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref MinticAmiId
+      InstanceType: t2.micro
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          SubnetId:
+            Fn::ImportValue: Mintic-SubnetPublic2
+          DeviceIndex: 0
+          GroupSet:
+            - Fn::ImportValue: Mintic-SecurityGroupId
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<html><body><h1>Hola desde EC2 AZ2 - IP: $(hostname -f)</h1></body></html>" > /var/www/html/index.html
 
 Outputs:
-  InstanceId:
-    Description: ID of the EC2 instance
-    Value: !Ref EC2WebInstance
-  PublicIP:
-    Description: Public IP address of the EC2 instance
-    Value: !GetAtt EC2WebInstance.PublicIp
-  WebsiteURL:
-    Description: URL to access the deployed website
-    Value: !Sub http://${EC2WebInstance.PublicIp}
+  MinticEC2AZ1PublicIP:
+    Description: IP pública de la instancia EC2 en AZ1
+    Value: !GetAtt MinticEC2AZ1.PublicIp
+
+  MinticEC2AZ2PublicIP:
+    Description: IP pública de la instancia EC2 en AZ2
+    Value: !GetAtt MinticEC2AZ2.PublicIp
