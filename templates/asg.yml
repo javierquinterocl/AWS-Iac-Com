@@ -3,9 +3,9 @@ Description: Auto Scaling Group con LaunchTemplate y WarmPool
 
 Parameters:
   KeyName:
-    Type: AWS::EC2::KeyPair::pardeclaveshoy
+    Type: AWS::EC2::KeyPair::KeyName
     Description: Nombre del par de claves SSH
-    Default: KeyNew
+    Default: pardeclaveshoy
 
   AmiId:
     Type: String
@@ -25,7 +25,7 @@ Resources:
       LaunchTemplateData:
         ImageId: !Ref AmiId
         InstanceType: !Ref InstanceType
-        KeyName: !Ref pardeclaveshoy
+        KeyName: !Ref KeyName
         SecurityGroupIds:
           - !ImportValue MinticSecurity-SG
         UserData:

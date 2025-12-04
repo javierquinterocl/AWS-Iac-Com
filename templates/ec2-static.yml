@@ -23,7 +23,7 @@ Resources:
     Properties:
       ImageId: !Ref AmiId
       InstanceType: !Ref InstanceType
-      KeyName: !Ref pardeclaveshoy
+      KeyName: !Ref KeyName
       NetworkInterfaces:
         - AssociatePublicIpAddress: true
           SubnetId: !ImportValue MinticVPC-PublicSubnet1
@@ -46,7 +46,7 @@ Resources:
     Properties:
       ImageId: !Ref AmiId
       InstanceType: !Ref InstanceType
-      KeyName: !Ref pardeclaveshoy
+      KeyName: !Ref KeyName
       NetworkInterfaces:
         - AssociatePublicIpAddress: true
           SubnetId: !ImportValue MinticVPC-PublicSubnet2
