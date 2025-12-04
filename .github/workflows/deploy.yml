@@ -94,7 +94,7 @@ jobs:
             --template-file templates/ec2-static.yml \
             --stack-name MinticEC2Stack \
             --parameter-overrides \
-              KeyName=KeyNew \
+              KeyName=pardeclaveshoy \
               AmiId=ami-0f88e80871fd81e91 \
               InstanceType=t3.micro \
             --no-fail-on-empty-changeset
@@ -140,7 +140,7 @@ jobs:
             --template-file templates/asg.yml \
             --stack-name MinticASGStack \
             --parameter-overrides \
-              KeyName=KeyNew \
+              KeyName=pardeclaveshoy \
               AmiId=ami-0f88e80871fd81e91 \
               InstanceType=t3.micro \
             --no-fail-on-empty-changeset
