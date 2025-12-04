@@ -1,32 +1,39 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Plantilla para Application Load Balancer (ALB) público con Target Group y Listener para Mintic
+Description: Application Load Balancer con TargetGroup y Listener
 
 Resources:
-
-  # Application Load Balancer (ALB) público
   MinticALB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Name: MinticALB
       Subnets:
-        - !ImportValue Mintic-SubnetPublic1  # Importa desde VPC stack
-        - !ImportValue Mintic-SubnetPublic2
+        - !ImportValue MinticVPC-PublicSubnet1
+        - !ImportValue MinticVPC-PublicSubnet2
       SecurityGroups:
-        - !ImportValue Mintic-SecurityGroupId  # Importa desde Security stack
+        - !ImportValue MinticSecurity-SG
       Scheme: internet-facing
       Type: application
+      Tags:
+        - Key: Name
+          Value: MinticALB
 
-  # Target group para el ALB
   MinticTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      VpcId: !ImportValue Mintic-VPCId  # Importa la VPC desde VPC stack
+      VpcId: !ImportValue MinticVPC-ID
       Protocol: HTTP
       Port: 80
       TargetType: instance
       HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      Tags:
+        - Key: Name
+          Value: MinticTargetGroup
 
-  # Listener del ALB en el puerto 80
   MinticListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -38,17 +45,14 @@ Resources:
           TargetGroupArn: !Ref MinticTargetGroup
 
 Outputs:
-
-  # DNS del Application Load Balancer
-  MinticALBDNS:
+  ALBDNSName:
     Description: DNS del Application Load Balancer
     Value: !GetAtt MinticALB.DNSName
     Export:
-      Name: MinticALBDNS
+      Name: MinticALB-DNS
 
-  # ARN del Target Group para relacionarlo con ASG
-  MinticTargetGroupArn:
+  TargetGroupArn:
     Description: ARN del Target Group
     Value: !Ref MinticTargetGroup
     Export:
-      Name: MinticTargetGroupArn
+      Name: MinticALB-TargetGroupArn

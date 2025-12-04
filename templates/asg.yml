@@ -1,75 +1,81 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Plantilla para Auto Scaling Group (ASG) con Launch Template y warm pool para Mintic
+Description: Auto Scaling Group con LaunchTemplate y WarmPool
+
+Parameters:
+  KeyName:
+    Type: AWS::EC2::KeyPair::pardeclaveshoy
+    Description: Nombre del par de claves SSH
+    Default: KeyNew
+
+  AmiId:
+    Type: String
+    Description: AMI para instancias EC2
+    Default: ami-0f88e80871fd81e91
+
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    Description: Tipo de instancia
 
 Resources:
-
-  # Plantilla de lanzamiento para el Auto Scaling Group
   MinticLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
+      LaunchTemplateName: MinticLaunchTemplate
       LaunchTemplateData:
-        ImageId: ami-0f88e80871fd81e91  # Puedes parametrizar si quieres
-        InstanceType: t2.micro
+        ImageId: !Ref AmiId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref pardeclaveshoy
         SecurityGroupIds:
-          - !ImportValue Mintic-SecurityGroupId  # Importa el SG exportado desde Security Stack
+          - !ImportValue MinticSecurity-SG
         UserData:
           Fn::Base64: !Sub |
             #!/bin/bash
             yum update -y
             yum install -y httpd
-            systemctl start httpd
-            systemctl enable httpd
-            echo "<html><body><h1>¡Hola desde CloudFormation ASG - IP: $(hostname -f)!</h1></body></html>" > /var/www/html/index.html
+            systemctl enable --now httpd
+            echo "<html><body><h1>¡Hola desde ASG $(hostname -f)!</h1></body></html>" > /var/www/html/index.html
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: MinticASG-Instance
 
-  # Auto Scaling Group con 4 instancias distribuidas en 2 AZ
   MinticASG:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
+      AutoScalingGroupName: MinticASG
       VPCZoneIdentifier:
-        - !ImportValue Mintic-SubnetPublic1   # Importa desde VPC stack
-        - !ImportValue Mintic-SubnetPublic2
+        - !ImportValue MinticVPC-PublicSubnet1
+        - !ImportValue MinticVPC-PublicSubnet2
       LaunchTemplate:
         LaunchTemplateId: !Ref MinticLaunchTemplate
         Version: !GetAtt MinticLaunchTemplate.LatestVersionNumber
-      MinSize: '4'
+      MinSize: '2'
       MaxSize: '4'
-      DesiredCapacity: '4'
+      DesiredCapacity: '2'
       TargetGroupARNs:
-        - !ImportValue MinticTargetGroupArn    # Importa desde ALB stack
+        - !ImportValue MinticALB-TargetGroupArn
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      Tags:
+        - Key: Name
+          Value: MinticASG
+          PropagateAtLaunch: true
 
-  # Apaga todas las instancias del ASG a las 8:00 AM hora Colombia (13:00 UTC)
-  MinticASGStopSchedule:
-    Type: AWS::AutoScaling::ScheduledAction
-    Properties:
-      AutoScalingGroupName: !Ref MinticASG
-      MinSize: 0
-      MaxSize: 0    
-      DesiredCapacity: 0
-      Recurrence: "0 13 * * *"   # 8:00 AM Colombia
-
-  # Enciende todas las instancias del ASG a las 8:15 AM hora Colombia (13:15 UTC)
-  MinticASGStartSchedule:
-    Type: AWS::AutoScaling::ScheduledAction
-    Properties:
-      AutoScalingGroupName: !Ref MinticASG
-      MinSize: 4
-      MaxSize: 4      
-      DesiredCapacity: 4
-      Recurrence: "15 13 * * *"  # 8:15 AM Colombia
-
-  # Warm pool para mantener 2 instancias "listas" pero detenidas
   MinticWarmPool:
     Type: AWS::AutoScaling::WarmPool
     Properties:
       AutoScalingGroupName: !Ref MinticASG
-      PoolState: Stopped  # Las instancias estarán en estado detenido
-      MinSize: 2          # Mantiene 2 instancias en el warm pool
+      PoolState: Stopped
+      MinSize: 1
+      MaxGroupPreparedCapacity: 3
 
 Outputs:
-
-  # ID del Auto Scaling Group
-  MinticASGId:
-    Description: ID del Auto Scaling Group
+  ASGName:
+    Description: Nombre del Auto Scaling Group
     Value: !Ref MinticASG
-    Export:
-      Name: MinticASGId
+
+  LaunchTemplateId:
+    Description: ID del Launch Template
+    Value: !Ref MinticLaunchTemplate

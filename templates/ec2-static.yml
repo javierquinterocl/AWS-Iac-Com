@@ -1,63 +1,74 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Instancias EC2 estáticas en dos AZ con UserData
+Description: 2 instancias EC2 estáticas en diferentes AZ
 
 Parameters:
-  MinticAmiId:
-    Description: AMI para las instancias EC2
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Nombre del par de claves SSH
+    Default: pardeclaveshoy
+
+  AmiId:
     Type: String
+    Description: AMI para instancias EC2
     Default: ami-0f88e80871fd81e91
 
-Resources:
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    Description: Tipo de instancia
 
-  # Instancia EC2 estática en AZ1 con UserData
+Resources:
   MinticEC2AZ1:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !Ref MinticAmiId
-      InstanceType: t2.micro
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref pardeclaveshoy
       NetworkInterfaces:
         - AssociatePublicIpAddress: true
-          SubnetId:
-            Fn::ImportValue: Mintic-SubnetPublic1
+          SubnetId: !ImportValue MinticVPC-PublicSubnet1
           DeviceIndex: 0
           GroupSet:
-            - Fn::ImportValue: Mintic-SecurityGroupId
+            - !ImportValue MinticSecurity-SG
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
           yum update -y
           yum install -y httpd
-          systemctl start httpd
-          systemctl enable httpd
-          echo "<html><body><h1>Hola desde EC2 AZ1 - IP: $(hostname -f)</h1></body></html>" > /var/www/html/index.html
+          systemctl enable --now httpd
+          echo "<html><body><h1>Hola desde EC2 AZ1 - $(hostname -f)</h1></body></html>" > /var/www/html/index.html
+      Tags:
+        - Key: Name
+          Value: MinticEC2-AZ1
 
-  # Instancia EC2 estática en AZ2 con UserData
   MinticEC2AZ2:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !Ref MinticAmiId
-      InstanceType: t2.micro
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref pardeclaveshoy
       NetworkInterfaces:
         - AssociatePublicIpAddress: true
-          SubnetId:
-            Fn::ImportValue: Mintic-SubnetPublic2
+          SubnetId: !ImportValue MinticVPC-PublicSubnet2
           DeviceIndex: 0
           GroupSet:
-            - Fn::ImportValue: Mintic-SecurityGroupId
+            - !ImportValue MinticSecurity-SG
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
           yum update -y
           yum install -y httpd
-          systemctl start httpd
-          systemctl enable httpd
-          echo "<html><body><h1>Hola desde EC2 AZ2 - IP: $(hostname -f)</h1></body></html>" > /var/www/html/index.html
+          systemctl enable --now httpd
+          echo "<html><body><h1>Hola desde EC2 AZ2 - $(hostname -f)</h1></body></html>" > /var/www/html/index.html
+      Tags:
+        - Key: Name
+          Value: MinticEC2-AZ2
 
 Outputs:
-  MinticEC2AZ1PublicIP:
-    Description: IP pública de la instancia EC2 en AZ1
+  EC2AZ1PublicIP:
+    Description: IP pública EC2 AZ1
     Value: !GetAtt MinticEC2AZ1.PublicIp
 
-  MinticEC2AZ2PublicIP:
-    Description: IP pública de la instancia EC2 en AZ2
+  EC2AZ2PublicIP:
+    Description: IP pública EC2 AZ2
     Value: !GetAtt MinticEC2AZ2.PublicIp
